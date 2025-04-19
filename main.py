@@ -1,7 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import List, Tuple
 import openai
@@ -18,6 +19,10 @@ import tiktoken
 import os.path
 import pickle
 import hashlib
+from sqlalchemy.orm import Session
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets
+from models import SessionLocal, User, ChatHistory, init_db
 
 # Load environment variables
 load_dotenv()
@@ -50,6 +55,10 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[Message]
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 # Text preprocessing functions
 def clean_text(text: str) -> str:
@@ -123,6 +132,33 @@ def get_context_hash(text: str) -> str:
 # Initialize vector database
 vector_db = VectorDB()
 
+# Initialize database
+init_db()
+
+# Security
+security = HTTPBasic()
+
+# Templates
+templates = Jinja2Templates(directory="templates")
+
+# Database dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_current_user(credentials: HTTPBasicCredentials = Depends(security), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == credentials.username).first()
+    if not user or not user.check_password(credentials.password):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return user
+
 # Modify startup event to handle local storage
 @app.on_event("startup")
 async def startup_event():
@@ -155,12 +191,9 @@ async def startup_event():
         with open(hash_path, 'w') as f:
             f.write(current_hash)
 
-async def generate_response(messages: List[Message]):
+async def generate_response(messages: List[Message], db: Session = Depends(get_db)):
     try:
-        # Get the user's latest message
         user_message = messages[-1].content
-        
-        # Query vector database for relevant context
         relevant_chunks = vector_db.search(user_message, k=5)
         
         print("\n=== Additional Context from Vector DB ===")
@@ -185,17 +218,29 @@ async def generate_response(messages: List[Message]):
             stream=True
         )
         
+        full_response = ""
         for chunk in response:
             if chunk and chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+                content = chunk.choices[0].delta.content
+                full_response += content
+                yield content
+        
+        # Store chat history
+        chat_entry = ChatHistory(
+            user_query=user_message,
+            bot_response=full_response,
+            additional_context=additional_context
+        )
+        db.add(chat_entry)
+        db.commit()
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat")
-async def chat_endpoint(request: ChatRequest):
+async def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
     return StreamingResponse(
-        generate_response(request.messages),
+        generate_response(request.messages, db),
         media_type="text/event-stream"
     )
 
@@ -206,4 +251,41 @@ async def root():
 # Add a health check endpoint
 @app.get("/healthz")
 async def health_check():
-    return {"status": "healthy"} 
+    return {"status": "healthy"}
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    chat_history = db.query(ChatHistory).order_by(ChatHistory.timestamp.desc()).all()
+    return templates.TemplateResponse(
+        "admin.html",
+        {"request": request, "chat_history": chat_history}
+    )
+
+@app.get("/admin/login")
+async def admin_login():
+    return RedirectResponse(url="/admin", status_code=303)
+
+@app.get("/admin/logout")
+async def admin_logout():
+    response = RedirectResponse(url="/admin", status_code=303)
+    response.headers["WWW-Authenticate"] = "Basic realm='Admin Area'"
+    return response
+
+@app.post("/admin/change-password")
+async def change_password(
+    request: PasswordChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Verify current password
+    if not current_user.check_password(request.current_password):
+        raise HTTPException(
+            status_code=400,
+            detail="Current password is incorrect"
+        )
+    
+    # Set new password
+    current_user.set_password(request.new_password)
+    db.commit()
+    
+    return {"message": "Password changed successfully"} 

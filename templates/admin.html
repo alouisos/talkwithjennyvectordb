@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard - Chat History</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .chat-entry {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .query {
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .response {
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        .context {
+            background-color: #f9f9f9;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .password-change-form {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .password-change-form div {
+            margin-bottom: 10px;
+        }
+        .password-change-form label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .password-change-form input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .password-change-form button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .password-change-form button:hover {
+            background-color: #0056b3;
+        }
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .logout-button {
+            background-color: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .logout-button:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-container">
+            <h1>Chat History</h1>
+            <a href="/admin/logout" class="logout-button">Logout</a>
+        </div>
+        <div class="password-change-form">
+            <h2>Change Password</h2>
+            <form id="passwordChangeForm" onsubmit="return changePassword(event)">
+                <div>
+                    <label for="currentPassword">Current Password:</label>
+                    <input type="password" id="currentPassword" required>
+                </div>
+                <div>
+                    <label for="newPassword">New Password:</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <button type="submit">Change Password</button>
+            </form>
+        </div>
+        {% for chat in chat_history %}
+        <div class="chat-entry">
+            <div class="timestamp">{{ chat.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+            <div class="query">User Query: {{ chat.user_query }}</div>
+            <div class="response">Bot Response: {{ chat.bot_response }}</div>
+            <div class="context">
+                <strong>Additional Context:</strong><br>
+                {{ chat.additional_context }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <script>
+    async function changePassword(event) {
+        event.preventDefault();
+        
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        
+        try {
+            const response = await fetch('/admin/change-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    current_password: currentPassword,
+                    new_password: newPassword
+                })
+            });
+            
+            if (response.ok) {
+                alert('Password changed successfully');
+                document.getElementById('passwordChangeForm').reset();
+            } else {
+                const error = await response.json();
+                alert(error.detail || 'Failed to change password');
+            }
+        } catch (error) {
+            alert('Error changing password');
+        }
+        
+        return false;
+    }
+    </script>
+</body>
+</html> 

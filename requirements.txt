@@ -8,3 +8,5 @@ starlette==0.36.3
 faiss-cpu
 numpy
 tiktoken
+jinja2
+sqlalchemy
