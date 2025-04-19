@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Talk With Jenny</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            height: 100vh;
+            background: url('/static/background.jpg') center center fixed;
+            background-size: cover; 
+            color: white;
+            position: fixed;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 1;
+        }
+
+        .chat-container {
+            position: absolute;
+            z-index: 2;
+            height: 100vh;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            gap: 0;
+            overflow-y: auto;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .chat-header {
+            text-align: center;
+            padding: 20px 0;
+            font-size: 2.5em;
+            font-weight: 300;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            margin: 0;
+            margin-bottom: 0;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            border-radius: 15px 15px 0 0;
+            background: rgba(0, 0, 0, 0.2);
+            margin-bottom: 0;
+            height: calc(100vh - 250px);
+            border-bottom: none;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 15px;
+            background: rgba(44, 44, 44, 0.5);
+            backdrop-filter: blur(10px);
+            color: white;
+            margin: 5px 0;
+            position: relative;
+            animation: fadeIn 0.3s ease-in;
+            line-height: 1.5;
+            letter-spacing: 0.2px;
+        }
+
+        .message .timestamp {
+            position: absolute;
+            bottom: -20px;
+            right: 10px;
+            font-size: 0.7em;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background: rgba(44, 44, 44, 0.5);
+        }
+
+        .assistant-message {
+            align-self: flex-start;
+            background: rgba(66, 66, 66, 0.5);
+        }
+
+        .input-container {
+            position: relative;
+            bottom: 0;
+            width: 100%;
+            max-width: 800px;
+            margin: -1px auto 0;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 0 0 15px 15px;
+            backdrop-filter: blur(5px);
+            border-top: none;
+        }
+
+        .input-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        #messageInput {
+            width: 100%;
+            padding: 15px 50px 15px 20px;
+            border: none;
+            border-radius: 25px;
+            background: rgba(44, 44, 44, 0.5);
+            backdrop-filter: blur(5px);
+            color: white;
+            font-size: 16px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        #messageInput::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .send-button {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 10px;
+            font-size: 1.2em;
+        }
+
+        .send-button:hover {
+            opacity: 0.8;
+        }
+
+        /* Hide scrollbar but keep functionality */
+        .chat-messages::-webkit-scrollbar {
+            width: 0px;
+        }
+
+        /* Custom scrollbar for Firefox */
+        .chat-messages {
+            scrollbar-width: none;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Enhanced responsive design */
+        @media (max-width: 768px) {
+            body {
+                position: fixed;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+            }
+
+            .chat-container {
+                padding: 10px;
+                padding-bottom: 80px;
+                height: 100vh;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                overflow-y: auto;
+                transform: none;
+            }
+
+            .chat-header {
+                position: sticky;
+                top: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 3;
+                padding: 10px 0;
+                margin: 0;
+            }
+
+            .chat-messages {
+                flex: 1;
+                height: auto;
+                min-height: 0;
+                margin-bottom: 70px;
+                overflow-y: auto;
+                border-radius: 15px 15px 0 0;
+                padding-bottom: 30px;
+            }
+
+            .input-container {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: rgba(0, 0, 0, 0.8);
+                margin: 0;
+                padding: 15px;
+                width: 100%;
+                z-index: 4;
+                border-radius: 0;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                height: 70px;
+            }
+
+            #messageInput {
+                background: rgba(44, 44, 44, 0.3);
+            }
+
+            .message {
+                max-width: 95%;
+                font-size: 0.95em;
+                margin-bottom: 25px;
+            }
+
+            .message:last-child {
+                margin-bottom: 0;
+            }
+        }
+
+        /* Additional responsive breakpoint for very small screens */
+        @media (max-width: 480px) {
+            .chat-header {
+                font-size: 1.5em;
+            }
+
+            .message {
+                max-width: 98%;
+                padding: 10px 12px;
+            }
+        }
+
+        /* Add this media query for desktop screens */
+        @media (min-height: 800px) {
+            .chat-container {
+                justify-content: center;
+            }
+            
+            .chat-header {
+                margin-top: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay"></div>
+    <div class="chat-container">
+        <h1 class="chat-header">Talk With Jenny</h1>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="input-container">
+            <div class="input-wrapper">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="Type your message..."
+                    autocomplete="off"
+                >
+                <button class="send-button" onclick="sendMessage()">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const messageInput = document.getElementById('messageInput');
+        const chatMessages = document.getElementById('chatMessages');
+        const sendButton = document.querySelector('.send-button');
+    
+        let conversationHistory = [];
+    
+        function addMessage(content, isUser = false, timestamp = new Date()) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.textContent = content;
+            
+            const timeSpan = document.createElement('div');
+            timeSpan.className = 'timestamp';
+            timeSpan.textContent = formatTimestamp(timestamp);
+            
+            messageDiv.appendChild(messageContent);
+            messageDiv.appendChild(timeSpan);
+            return messageDiv;
+        }
+    
+        function scrollToBottom() {
+            const chatContainer = document.querySelector('.chat-container');
+            const chatMessages = document.querySelector('.chat-messages');
+            
+            // For desktop
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // For mobile
+            if (window.innerWidth <= 768) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+    
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+    
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+    
+            const userMessageDiv = addMessage(message, true);
+            chatMessages.appendChild(userMessageDiv);
+            
+            const aiMessageDiv = addMessage('', false);
+            chatMessages.appendChild(aiMessageDiv);
+            const aiMessageContent = aiMessageDiv.querySelector('.message-content');
+            
+            messageInput.value = '';
+            
+            // Replace all scrolling code with the new scrollToBottom function
+            scrollToBottom();
+    
+            try {
+                conversationHistory.push({
+                    role: 'user',
+                    content: message,
+                    timestamp: new Date().toISOString()
+                });
+    
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ messages: conversationHistory })
+                });
+    
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let aiResponse = '';
+    
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const text = decoder.decode(value);
+                    aiResponse += text;
+                    
+                    aiMessageContent.textContent = aiResponse;
+                    scrollToBottom();
+                }
+    
+                conversationHistory.push({
+                    role: 'assistant',
+                    content: aiResponse,
+                    timestamp: new Date().toISOString()
+                });
+                
+                localStorage.setItem('chatHistory', JSON.stringify(conversationHistory));
+    
+            } catch (error) {
+                console.error('Error:', error);
+                aiMessageContent.textContent = 'Error occurred while fetching response';
+                aiMessageDiv.classList.add('error');
+            } finally {
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                messageInput.focus();
+                
+                // Final scroll with a small delay to ensure rendering is complete
+                setTimeout(scrollToBottom, 100);
+            }
+        }
+    
+        function formatTimestamp(date) {
+            return new Intl.DateTimeFormat('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).format(date);
+        }
+    
+        function loadHistory() {
+            const savedHistory = localStorage.getItem('chatHistory');
+            if (savedHistory) {
+                conversationHistory = JSON.parse(savedHistory);
+                conversationHistory.forEach(msg => {
+                    const messageDiv = addMessage(
+                        msg.content, 
+                        msg.role === 'user',
+                        new Date(msg.timestamp)
+                    );
+                    chatMessages.appendChild(messageDiv);
+                });
+                scrollToBottom();
+            }
+        }
+    
+        function clearChat() {
+            if (confirm('Are you sure you want to clear the chat history?')) {
+                conversationHistory = [];
+                localStorage.removeItem('chatHistory');
+                chatMessages.innerHTML = '';
+            }
+        }
+    
+        // Handle Enter key press
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    
+        // Auto-resize textarea
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+    
+        // Clear local storage and load history when page loads
+        window.onload = () => {
+            localStorage.removeItem('chatHistory'); // Clear local storage
+            loadHistory();
+            messageInput.focus();
+        };
+    </script>
+</body>
+</html> 
