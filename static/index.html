@@ -276,6 +276,89 @@
                 margin-top: 0;
             }
         }
+
+        .feedback-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 5px;
+            justify-content: flex-end;
+        }
+
+        .feedback-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+            color: rgba(255, 255, 255, 0.7);
+            transition: color 0.3s;
+        }
+
+        .feedback-button:hover {
+            color: white;
+        }
+
+        .feedback-button.active {
+            color: #4CAF50;
+        }
+
+        .feedback-button.thumbs-down.active {
+            color: #f44336;
+        }
+
+        .feedback-form {
+            display: block;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .feedback-form.visible {
+            opacity: 1;
+        }
+
+        .feedback-form textarea {
+            width: 100%;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            margin-bottom: 8px;
+            resize: vertical;
+        }
+
+        .feedback-form button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+
+        .feedback-form button:hover {
+            background: #45a049;
+        }
+
+        .temporary-message {
+            animation: fadeOut 3s forwards;
+        }
+
+        @keyframes fadeOut {
+            0% {
+                opacity: 1;
+            }
+            70% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -302,6 +385,7 @@
         const sendButton = document.querySelector('.send-button');
     
         let conversationHistory = [];
+        let lastChatId = null;  // Store the last chat history ID
     
         function addMessage(content, isUser = false, timestamp = new Date()) {
             const messageDiv = document.createElement('div');
@@ -317,6 +401,26 @@
             
             messageDiv.appendChild(messageContent);
             messageDiv.appendChild(timeSpan);
+
+            if (!isUser) {
+                const feedbackContainer = document.createElement('div');
+                feedbackContainer.className = 'feedback-container';
+                
+                const thumbsUp = document.createElement('button');
+                thumbsUp.className = 'feedback-button';
+                thumbsUp.innerHTML = '👍';
+                thumbsUp.onclick = () => handleFeedback(messageDiv, true);
+                
+                const thumbsDown = document.createElement('button');
+                thumbsDown.className = 'feedback-button';
+                thumbsDown.innerHTML = '👎';
+                thumbsDown.onclick = () => handleFeedback(messageDiv, false);
+                
+                feedbackContainer.appendChild(thumbsUp);
+                feedbackContainer.appendChild(thumbsDown);
+                messageDiv.appendChild(feedbackContainer);
+            }
+            
             return messageDiv;
         }
     
@@ -349,7 +453,6 @@
             
             messageInput.value = '';
             
-            // Replace all scrolling code with the new scrollToBottom function
             scrollToBottom();
     
             try {
@@ -378,6 +481,15 @@
                     const text = decoder.decode(value);
                     aiResponse += text;
                     
+                    // Check for chat ID in the response
+                    const chatIdMatch = text.match(/\[CHAT_ID:(\d+)\]/);
+                    if (chatIdMatch) {
+                        lastChatId = parseInt(chatIdMatch[1]);
+                        console.log('Received chat ID:', lastChatId);
+                        // Remove the chat ID from the displayed text
+                        aiResponse = aiResponse.replace(/\[CHAT_ID:\d+\]/, '');
+                    }
+                    
                     aiMessageContent.textContent = aiResponse;
                     scrollToBottom();
                 }
@@ -399,7 +511,6 @@
                 sendButton.disabled = false;
                 messageInput.focus();
                 
-                // Final scroll with a small delay to ensure rendering is complete
                 setTimeout(scrollToBottom, 100);
             }
         }
@@ -456,6 +567,102 @@
             loadHistory();
             messageInput.focus();
         };
+
+        async function handleFeedback(messageDiv, isPositive) {
+            const feedbackButtons = messageDiv.querySelectorAll('.feedback-button');
+            
+            // Remove active class from all buttons
+            feedbackButtons.forEach(btn => btn.classList.remove('active'));
+            
+            if (isPositive) {
+                // Handle thumbs up
+                feedbackButtons[0].classList.add('active');
+                await submitFeedback(messageDiv, true);
+            } else {
+                // Handle thumbs down
+                feedbackButtons[1].classList.add('active');
+                const feedbackForm = messageDiv.querySelector('.feedback-form');
+                if (!feedbackForm) {
+                    const form = document.createElement('div');
+                    form.className = 'feedback-form';
+                    form.innerHTML = `
+                        <textarea placeholder="Please provide feedback on what could be improved..." rows="3"></textarea>
+                        <button onclick="submitFeedback(this.parentElement.parentElement, false)">Submit Feedback</button>
+                    `;
+                    messageDiv.appendChild(form);
+                    // Trigger reflow to enable transition
+                    form.offsetHeight;
+                    form.classList.add('visible');
+                } else {
+                    feedbackForm.classList.add('visible');
+                }
+            }
+        }
+
+        async function submitFeedback(messageDiv, isPositive) {
+            if (!lastChatId) {
+                console.error('No chat ID available for feedback');
+                alert('Error: No chat ID available. Please try sending a message first.');
+                return;
+            }
+
+            const feedbackText = isPositive ? null : messageDiv.querySelector('.feedback-form textarea').value;
+            
+            // Validate feedback text for negative feedback
+            if (!isPositive && !feedbackText) {
+                alert('Please provide feedback text for negative feedback');
+                return;
+            }
+            
+            const requestData = {
+                chat_history_id: lastChatId,
+                is_positive: isPositive,
+                feedback_text: feedbackText || null
+            };
+            
+            console.log('Submitting feedback with data:', requestData);
+            
+            try {
+                const response = await fetch('/feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const responseData = await response.json();
+                console.log('Feedback response:', responseData);
+                
+                if (!response.ok) {
+                    console.error('Feedback submission error:', responseData);
+                    throw new Error(responseData.detail?.error || responseData.detail || 'Failed to submit feedback');
+                }
+
+                // Add temporary feedback status message to chat
+                const feedbackMessage = isPositive ? '👍 Thank you for your positive feedback!' : '👎 Thank you for your feedback!';
+                const feedbackDiv = addMessage(feedbackMessage, false);
+                feedbackDiv.classList.add('temporary-message');
+                chatMessages.appendChild(feedbackDiv);
+                scrollToBottom();
+
+                // Remove the message after animation completes
+                setTimeout(() => {
+                    feedbackDiv.remove();
+                }, 3000);
+
+                if (!isPositive) {
+                    const feedbackForm = messageDiv.querySelector('.feedback-form');
+                    feedbackForm.classList.remove('visible');
+                    setTimeout(() => {
+                        feedbackForm.remove();
+                    }, 300);
+                }
+            } catch (error) {
+                console.error('Error submitting feedback:', error);
+                alert(error.message || 'Failed to submit feedback. Please try again.');
+            }
+        }
     </script>
 </body>
 </html> 

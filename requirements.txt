@@ -4,9 +4,9 @@ python-dotenv==1.0.1
 openai==1.12.0
 httpx==0.27.2
 python-multipart==0.0.9
-starlette==0.36.3 
-faiss-cpu
-numpy
-tiktoken
-jinja2
-sqlalchemy
+starlette==0.36.3
+faiss-cpu==1.7.4
+numpy==1.26.4
+tiktoken==0.6.0
+jinja2==3.1.3
+sqlalchemy==2.0.27

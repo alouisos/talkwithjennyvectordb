@@ -46,6 +46,23 @@
             border-radius: 3px;
             font-size: 0.9em;
         }
+        .feedback {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 3px;
+        }
+        .positive-feedback {
+            background-color: #e6ffe6;
+            border-left: 4px solid #4CAF50;
+        }
+        .negative-feedback {
+            background-color: #ffe6e6;
+            border-left: 4px solid #f44336;
+        }
+        .feedback-text {
+            margin-top: 5px;
+            font-style: italic;
+        }
         .password-change-form {
             margin-bottom: 30px;
             padding: 20px;
@@ -126,6 +143,14 @@
                 <strong>Additional Context:</strong><br>
                 {{ chat.additional_context }}
             </div>
+            {% if chat.feedback %}
+            <div class="feedback {% if chat.feedback.is_positive %}positive-feedback{% else %}negative-feedback{% endif %}">
+                <strong>Feedback:</strong> {% if chat.feedback.is_positive %}👍 Positive{% else %}👎 Negative{% endif %}
+                {% if chat.feedback.feedback_text %}
+                <div class="feedback-text">{{ chat.feedback.feedback_text }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>

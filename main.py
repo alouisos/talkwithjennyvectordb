@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
-from typing import List, Tuple
+from pydantic import BaseModel, validator
+from typing import List, Tuple, Optional
 import openai
 import os
 from dotenv import load_dotenv
@@ -19,10 +19,10 @@ import tiktoken
 import os.path
 import pickle
 import hashlib
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import secrets
-from models import SessionLocal, User, ChatHistory, init_db
+from models import SessionLocal, User, ChatHistory, Feedback, init_db
 
 # Load environment variables
 load_dotenv()
@@ -59,6 +59,17 @@ class ChatRequest(BaseModel):
 class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str
+
+class FeedbackRequest(BaseModel):
+    chat_history_id: int
+    is_positive: bool
+    feedback_text: Optional[str] = None
+
+    @validator('feedback_text')
+    def validate_feedback_text(cls, v, values):
+        if not values.get('is_positive') and not v:
+            raise ValueError('Feedback text is required for negative feedback')
+        return v
 
 # Text preprocessing functions
 def clean_text(text: str) -> str:
@@ -191,6 +202,9 @@ async def startup_event():
         with open(hash_path, 'w') as f:
             f.write(current_hash)
 
+class ChatResponse:
+    last_chat_id = None
+
 async def generate_response(messages: List[Message], db: Session = Depends(get_db)):
     try:
         user_message = messages[-1].content
@@ -233,8 +247,13 @@ async def generate_response(messages: List[Message], db: Session = Depends(get_d
         )
         db.add(chat_entry)
         db.commit()
+        
+        # Send the chat ID as the last message
+        yield f"\n\n[CHAT_ID:{chat_entry.id}]"
+        print(f"Generated chat ID: {chat_entry.id}")
 
     except Exception as e:
+        print(f"Error in generate_response: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat")
@@ -255,7 +274,9 @@ async def health_check():
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    chat_history = db.query(ChatHistory).order_by(ChatHistory.timestamp.desc()).all()
+    chat_history = db.query(ChatHistory).options(
+        joinedload(ChatHistory.feedback)
+    ).order_by(ChatHistory.timestamp.desc()).all()
     return templates.TemplateResponse(
         "admin.html",
         {"request": request, "chat_history": chat_history}
@@ -288,4 +309,61 @@ async def change_password(
     current_user.set_password(request.new_password)
     db.commit()
     
-    return {"message": "Password changed successfully"} 
+    return {"message": "Password changed successfully"}
+
+@app.post("/feedback")
+async def submit_feedback(
+    feedback: FeedbackRequest,
+    db: Session = Depends(get_db)
+):
+    try:
+        print(f"Received feedback request: {feedback.dict()}")
+        
+        # Validate chat_history_id exists
+        if feedback.chat_history_id is None:
+            print("Error: chat_history_id is None")
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "Missing chat_history_id", "field": "chat_history_id"}
+            )
+            
+        chat_entry = db.query(ChatHistory).filter(ChatHistory.id == feedback.chat_history_id).first()
+        if not chat_entry:
+            print(f"Error: Chat history entry not found for ID: {feedback.chat_history_id}")
+            raise HTTPException(
+                status_code=404,
+                detail={"error": "Chat history entry not found", "chat_id": feedback.chat_history_id}
+            )
+        
+        # Validate feedback text for negative feedback
+        if not feedback.is_positive and not feedback.feedback_text:
+            print("Error: Feedback text required for negative feedback")
+            raise HTTPException(
+                status_code=422,
+                detail={"error": "Feedback text is required for negative feedback", "field": "feedback_text"}
+            )
+        
+        # Create new feedback entry
+        feedback_entry = Feedback(
+            chat_history_id=feedback.chat_history_id,
+            is_positive=1 if feedback.is_positive else 0,
+            feedback_text=feedback.feedback_text
+        )
+        db.add(feedback_entry)
+        db.commit()
+        print(f"Feedback successfully saved with ID: {feedback_entry.id}")
+        
+        return {
+            "status": "success",
+            "message": "Feedback submitted successfully",
+            "feedback_id": feedback_entry.id
+        }
+    except HTTPException as he:
+        print(f"HTTP Error processing feedback: {he.detail}")
+        raise he
+    except Exception as e:
+        print(f"Error processing feedback: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Internal server error", "message": str(e)}
+        ) 
