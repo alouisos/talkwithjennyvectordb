@@ -23,6 +23,9 @@ from sqlalchemy.orm import Session, joinedload
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import secrets
 from models import SessionLocal, User, ChatHistory, Feedback, init_db
+import csv
+import io
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -366,4 +369,52 @@ async def submit_feedback(
         raise HTTPException(
             status_code=500,
             detail={"error": "Internal server error", "message": str(e)}
-        ) 
+        )
+
+@app.get("/admin/export")
+async def export_chat_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Query chat history with feedback
+    chat_history = db.query(ChatHistory).options(
+        joinedload(ChatHistory.feedback)
+    ).order_by(ChatHistory.timestamp.desc()).all()
+    
+    # Create CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write header
+    writer.writerow([
+        'Timestamp',
+        'User Query',
+        'Bot Response',
+        'Additional Context',
+        'Feedback Type',
+        'Feedback Text'
+    ])
+    
+    # Write data
+    for chat in chat_history:
+        feedback_type = ''
+        feedback_text = ''
+        if chat.feedback:
+            feedback_type = 'Positive' if chat.feedback.is_positive else 'Negative'
+            feedback_text = chat.feedback.feedback_text or ''
+        
+        writer.writerow([
+            chat.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            chat.user_query,
+            chat.bot_response,
+            chat.additional_context or '',
+            feedback_type,
+            feedback_text
+        ])
+    
+    # Prepare response
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=chat_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        }
+    ) 

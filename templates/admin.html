@@ -99,6 +99,24 @@
             align-items: center;
             margin-bottom: 20px;
         }
+        .export-button {
+            background-color: #28a745;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        .export-button:hover {
+            background-color: #218838;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
         .logout-button {
             background-color: #dc3545;
             color: white;
@@ -118,7 +136,10 @@
     <div class="container">
         <div class="header-container">
             <h1>Chat History</h1>
-            <a href="/admin/logout" class="logout-button">Logout</a>
+            <div class="button-group">
+                <a href="/admin/export" class="export-button">Export to CSV</a>
+                <a href="/admin/logout" class="logout-button">Logout</a>
+            </div>
         </div>
         <div class="password-change-form">
             <h2>Change Password</h2>
