@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Talk With Jenny</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -359,6 +360,73 @@
                 opacity: 0;
             }
         }
+
+        /* Add styles for markdown content */
+        .message-content {
+            line-height: 1.6;
+        }
+
+        .message-content p {
+            margin: 0.5em 0;
+        }
+
+        .message-content pre {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+
+        .message-content code {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        .message-content ul, .message-content ol {
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }
+
+        .message-content blockquote {
+            border-left: 3px solid rgba(255, 255, 255, 0.3);
+            margin: 0.5em 0;
+            padding-left: 1em;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .message-content h1, .message-content h2, .message-content h3, 
+        .message-content h4, .message-content h5, .message-content h6 {
+            margin: 0.5em 0;
+            color: white;
+        }
+
+        .message-content a {
+            color: #4CAF50;
+            text-decoration: none;
+        }
+
+        .message-content a:hover {
+            text-decoration: underline;
+        }
+
+        .message-content table {
+            border-collapse: collapse;
+            margin: 0.5em 0;
+            width: 100%;
+        }
+
+        .message-content th, .message-content td {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.5em;
+            text-align: left;
+        }
+
+        .message-content th {
+            background: rgba(0, 0, 0, 0.2);
+        }
     </style>
 </head>
 <body>
@@ -396,7 +464,13 @@
             
             const messageContent = document.createElement('div');
             messageContent.className = 'message-content';
-            messageContent.textContent = content;
+            
+            // Use marked.js to parse markdown for assistant messages
+            if (!isUser) {
+                messageContent.innerHTML = marked.parse(content);
+            } else {
+                messageContent.textContent = content;
+            }
             
             const timeSpan = document.createElement('div');
             timeSpan.className = 'timestamp';
@@ -493,7 +567,8 @@
                         aiResponse = aiResponse.replace(/\[CHAT_ID:\d+\]/, '');
                     }
                     
-                    aiMessageContent.textContent = aiResponse;
+                    // Update the message content with parsed markdown
+                    aiMessageContent.innerHTML = marked.parse(aiResponse);
                     scrollToBottom();
                 }
     
